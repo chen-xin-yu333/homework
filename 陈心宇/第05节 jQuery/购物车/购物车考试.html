@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="car">
+        <section class="alert">成功删除 <span class="del_number">0</span> 件宝贝，如有误，可撤销本次删除</section>
+
+        <div class="shop_list"></div>
+
+        <section class="footer">
+            <ul>
+                <li>
+                    <input type="checkbox"> <label>全选</label>
+                </li>
+                <li>
+                    <a href="javascript:void(0)" class="del_all">删除</a>
+                </li>
+            </ul>
+            <ul>
+                <li>已选商品 <span class="total_num">0</span> 件</li>
+                <li>合计（不含运费）：<span class="total_price">0.00</span></li>
+                <li><button disabled>结 算</button></li>
+            </ul>
+        </section>
+    </div>
+
+    <template id="shop">
+        <section class="shop">
+            <header>
+                <input type="checkbox" onchange="shop_good_select_all(this)">
+                <label>店铺：<span></span></label>
+            </header>
+            <table></table>
+        </section>
+    </template>
+    <template id="good">
+        <tr>
+            <td><input type="checkbox" onchange="good_shop_select_all(this)"></td>
+            <td><img src="" alt=""></td>
+            <td></td>
+            <td>
+                <del>￥<span></span></del><br />
+                <strong>￥<span></span></strong>
+            </td>
+            <td>
+                <div class="input-group">
+                    <a href="javascript:void(0)" onclick="sub(this)">-</a>
+                    <input type="text" value="1" onblur="input_change(this)">
+                    <a href="javascript:void(0)" onclick="add(this)">+</a>
+                </div>
+            </td>
+            <td>￥<strong></strong></td>
+            <td><a href="javascript:void(0)" class="del-item" onclick="row_delete(this)">删除</a></td>
+        </tr>
+    </template>
+    <script src="jquery.min.js"></script>
+    <script src="public.js"></script>
+    <script>
+        //页面加载出来信息
+        $(function(){
+            $.getJSON('data/car.json',function(res){
+                console.log(res)
+                let shop_template=$($('#shop').html())
+                for(let sp of res){
+                    //克隆
+                    let shop=shop_template.clone();
+                    shop.find('header label span').text(sp.shop_name)
+                    //循环遍历出来每一个店铺下面的信息
+                    let good_template=$($('#good').html())
+                    for(let gd of sp.buy){
+                        let good=good_template.clone();
+                        good.find('td:nth-child(2) img').attr('src','images/'+gd.img)
+                        good.find('td:nth-child(3)').text(gd.title)
+                        good.find('td:nth-child(4) del span').text(gd.original)
+                        good.find('td:nth-child(4) strong span').text(gd.price)
+                        good.find('td:nth-child(5) input').val(gd.num)
+                        good.find('td:nth-child(6) strong').text(gd.num*gd.price)
+                        shop.find('table').append(good)
+                    }
+                    $('.shop_list').append(shop)
+                }
+            })
+        })
+        //点击上面的父的复选框选中
+        function shop_good_select_all(checkbox){
+            let shop=$(checkbox).parents('.shop')
+            let checkboxes=shop.find('table td:nth-child(1) input')
+           for(let ck of checkboxes){
+            ck.checked=checkbox.checked
+           }
+           $('.footer input')[0].checked=check_shop_checked()
+           total_price()
+           checked_num()
+           jiesuan()
+        }
+        //点击子类的复选框则父类的复选框也选中
+        function good_shop_select_all(checkbox){
+            let shop=$(checkbox).parents('.shop')
+            let fu_checkbox=shop.find('header input')
+            let zi_checkbox=shop.find('table td:nth-child(1) input')
+            let flag=true;
+            for(let ck of zi_checkbox){
+                if(!ck.checked){
+                    flag=false
+                    break
+                }
+            }
+            fu_checkbox[0].checked=flag
+            $('.footer input')[0].checked=check_shop_checked()
+            total_price()
+            checked_num()
+            jiesuan()
+        }
+        //点击全选所有的按钮全部选中
+        $('.footer input').change(function(){
+            for(let ck of $('[type="checkbox"]')){
+                ck.checked=this.checked
+            }
+            total_price()
+            checked_num()
+            jiesuan()
+        })
+        //检测是不是每个店铺都勾选了那么全选也选中
+        function check_shop_checked(){
+            let flag=true;
+            //判断在shop中长度为0则返回false
+            if($('.shop').find('tr').length==0){
+                return false;
+            }
+            for(let ck of $('header input')){
+                if(!ck.checked){
+                    flag=false
+                    break
+                }
+            }
+            return flag
+            total_price()
+        }
+        //点击加进行操作
+        function add(a){
+            let input=$(a).prev('input')
+            let num=input.val()
+           num++
+           input.val(num)
+           total_good_price($(a).parents('tr'),num)
+           
+        }
+        //点击减进行操作
+        function sub(a){
+            //取出a后面的一个元素
+            let input=$(a).next('input')
+           let num=input.val()
+           num--
+           if(num<=0){
+               num=0
+           }
+           input.val(num)
+           total_good_price($(a).parents('tr'),num)
+        }
+        //计算商品所选的件数的价钱结算
+        function total_good_price(tr,num){
+            let price=tr.find('td:nth-child(4) strong span').text()
+            //单价=价钱*数量
+            let total=price*num
+            //把最后的价钱在写回在页面上面
+            tr.find('td:nth-child(6) strong').text(total)
+            
+            total_price()
+        }
+        //计算在结算的时候总价钱（在选中复选框的时候计算他的价钱）
+        //在加减的文本框的时候需要进行结算的加减
+        function total_price(){
+           let tr=$('td :checked').parents('tr')
+           let price=tr.find('td:nth-child(6) strong')
+           let total=0
+           price.each(function(){
+               let price=$(this).text()
+               total+=parseFloat(price)
+           })
+          //把总的价钱赋值在页面的结算上面
+          $('.total_price').text(total)
+          $('.total_price').animate({slideUp:1000})
+         
+        }
+        //手动输入在文本框的值自动进行计算总价和商品的价钱
+        function input_change(input){
+            let tr=$(input).parents('tr')
+            let num=$(input).val()
+          let price=tr.find('td:nth-child(4) strong span').text()
+            let total=num*price
+            console.log(total)
+            tr.find('td:nth-child(6) strong').text(total)
+            total_price()
+        }
+        //点击商品信息的删除进行对商品删除的操作(因为在页面上面是在页面加载完成的时候才出来数据信息所以要绑定事件不能再页面上面直接进行绑定信息)
+        //在父类上面绑定信息('点击事件click',"在谁上面发生的")
+//         $('.shop_list').on('click','.del-item',function(){
+//         //     let shop=$(this).parents('.shop')
+//         //     console.log(shop)
+//         //     let tr=$(this).parents('tr')
+//         //    tr.remove()
+//         //    if(shop.find('tr').length==0){
+//         //     shop.remove()
+//         //    }
+//          //获取店铺DOM
+//          let shop=$(this).parents('.shop').slideUp(1000)
+//         console.log(shop)
+//         //删除当前行
+//         let tr=$(this).parents('tr').fadeOut(500)
+//         //判断店铺中是否还有行
+//         if(shop.find('tr').length==0){
+//             shop.remove()
+//         }
+//            total_price()
+//            $('.del_number').text(1)
+//         })
+        //点击全选旁边的删除进行删除操作(选中复选框)
+        $('.del_all').click(function(){
+            //全选删除文本内容=在商店下面找他的tr的长度
+           $('.del_number').text($('.shop').find('tr').length)
+           $('td :checked').each(function(){
+            let shop=$(this).parents('.shop')
+            let tr=$(this).parents('tr')
+            tr.remove();
+            if(shop.find('tr').length==0){
+                shop.remove()
+            }
+           })
+           //在全部删除完商品的信息的时候全选的复选框应该不是成勾选的状态
+           $('.footer input')[0].checked=check_shop_checked()
+           total_price()
+        })
+        //计算选中的数量
+        function checked_num(){
+            $(".total_num").text($('td :checked').length)
+        }
+        //选中复选框的时候结算的按钮变成可用
+        function jiesuan(){
+            if($('td :checked').length>0){
+                $('.footer button').addClass('enabled');
+               
+            }else{
+                $('.footer button').removeClass('enabled')
+               
+            }
+        }
+        
+        
+    </script>
+    <script>
+function row_delete(btn){
+        let table=$(btn).parents('table')
+        let section=$(table).parents('section')
+        $(btn.parentNode.parentNode).fadeOut(500,function(){
+            btn.parentNode.parentNode.remove()
+            if(section.find('[type="checkbox"]').length==1){
+                section.slideUp(500)
+            }
+            total_price()
+        })
+        
+    }
+    </script>
+
+    
